@@ -1,0 +1,25 @@
+# Local stack: API + PostgreSQL.   docker compose -f infra/docker-compose.yml up --build
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: iot
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-iot-dev-only}
+      POSTGRES_DB: iot
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U iot"]
+      interval: 5s
+      retries: 10
+    restart: unless-stopped
+  api:
+    build: { context: .., dockerfile: infra/Dockerfile }
+    environment:
+      DATABASE_URL: postgresql://iot:${POSTGRES_PASSWORD:-iot-dev-only}@db:5432/iot
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in your shell or in a .env next to this file}
+    ports: ["8000:8000"]
+    depends_on:
+      db: { condition: service_healthy }
+    restart: unless-stopped
+volumes:
+  pgdata:

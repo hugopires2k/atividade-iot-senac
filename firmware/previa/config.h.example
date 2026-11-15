@@ -1,0 +1,24 @@
+// Copy this file to config.h and fill it in. config.h is in .gitignore: never commit real keys.
+#pragma once
+
+#define WIFI_SSID        "your-hotspot"
+#define WIFI_PASS        "your-password"
+
+// Public HTTPS URL of the API (after deploy), e.g. https://iot-pi.onrender.com/api/v1/readings
+#define API_URL          "https://YOUR-API-HOST/api/v1/readings"
+#define DEVICE_ID        "esp32-lab-01"
+#define DEVICE_KEY       "key-returned-once-by-POST-/api/v1/devices"
+
+// ThingSpeak channel (field1=temperature, field2=humidity, field3=light)
+#define TS_WRITE_KEY     "YOUR_THINGSPEAK_WRITE_KEY"
+
+// Pins (change to match your wiring)
+#define DHT_PIN          4      // DHT22 data
+#define LDR_PIN          34     // LDR voltage divider on an ADC1 pin
+
+// Sampling: 20 s keeps us above ThingSpeak's 15 s minimum and gives the dashboard fresh data.
+#define SEND_INTERVAL_MS 20000UL
+
+// Optional: paste the root CA (PEM) of your API host to validate TLS properly.
+// If left undefined, the board connects without validating the certificate (previa only).
+// #define API_ROOT_CA "-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----\n"

@@ -1,0 +1,13 @@
+# Render Blueprint (optional). Or create a "Web Service" from the Dockerfile in the Render UI.
+services:
+  - type: web
+    name: iot-environment-monitor
+    runtime: docker
+    dockerfilePath: ./infra/Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false   # paste the Postgres internal URL here

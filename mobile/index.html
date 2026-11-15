@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f6b73">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg">
+<title>Environment Monitor</title>
+<style>
+  :root { --bg:#f2f4f3; --panel:#fff; --ink:#18242b; --muted:#5d6b73; --line:#d9dfe1; --accent:#0f6b73; --ok:#1f7a47; --bad:#b3261e; color-scheme:light; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#12181b; --panel:#1b2428; --ink:#e7eef0; --muted:#9aa9b0; --line:#2c3a40; --accent:#58c4cc; --ok:#5fcf8d; --bad:#ff8a80; color-scheme:dark; } }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.5 system-ui,-apple-system,sans-serif; padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom); }
+  .wrap { max-width:520px; margin:0 auto; padding:16px; }
+  h1 { font-size:18px; margin:4px 0 14px; }
+  label { display:block; font-size:13px; color:var(--muted); margin:12px 0 4px; }
+  input, select, button { font:inherit; width:100%; padding:12px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--ink); }
+  button { background:var(--accent); color:#fff; border:0; font-weight:600; margin-top:16px; }
+  button.ghost { background:transparent; color:var(--ink); border:1px solid var(--line); margin-top:0; width:auto; padding:6px 12px; }
+  :focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  .bar { display:flex; justify-content:space-between; align-items:center; }
+  .pill { display:inline-flex; gap:6px; align-items:center; font-weight:600; font-size:14px; }
+  .dot { width:10px; height:10px; border-radius:50%; background:var(--muted); }
+  .on .dot { background:var(--ok); } .off .dot { background:var(--bad); }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:14px 16px; margin:12px 0; }
+  .card .n { color:var(--muted); font-size:13px; } .card .v { font-size:38px; font-weight:650; letter-spacing:-.02em; }
+  .card .v small { font-size:16px; color:var(--muted); font-weight:500; }
+  .card.bad .v { color:var(--bad); font-size:22px; padding:8px 0; } .card.old .v { color:var(--muted); }
+  .note { border:1px solid var(--bad); color:var(--bad); border-radius:8px; padding:10px 12px; margin:12px 0; font-size:14px; }
+  .note.info { border-color:var(--line); color:var(--muted); }
+  [hidden] { display:none !important; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="bar"><h1>Environment Monitor</h1><button class="ghost" id="out" hidden>Log out</button></div>
+
+  <div id="login">
+    <label for="email">Email</label><input id="email" type="email" autocomplete="username">
+    <label for="pw">Password</label><input id="pw" type="password" autocomplete="current-password">
+    <button id="go">Sign in</button>
+    <p id="err" style="color:var(--bad)"></p>
+  </div>
+
+  <div id="main" hidden>
+    <select id="dev" aria-label="Device"></select>
+    <p class="pill" id="pill"><span class="dot"></span><span id="pilltxt">-</span></p>
+    <div id="notes"></div>
+    <div class="card" id="c-t"><div class="n">Temperature</div><div class="v">-</div></div>
+    <div class="card" id="c-h"><div class="n">Humidity</div><div class="v">-</div></div>
+    <div class="card" id="c-l"><div class="n">Light</div><div class="v">-</div></div>
+    <p style="color:var(--muted);font-size:13px" id="updated"></p>
+  </div>
+</div>
+<script>
+const API = "/api/v1", $ = (i) => document.getElementById(i);
+let token = localStorage.getItem("mtoken"), timer;
+const hhmm = (iso) => iso ? new Date(iso).toLocaleTimeString([], { hour:"2-digit", minute:"2-digit", second:"2-digit" }) : "never";
+
+async function api(p, o = {}) {
+  const r = await fetch(API + p, { ...o, headers: { "Content-Type":"application/json", ...(token ? { Authorization:"Bearer " + token } : {}) } });
+  if (r.status === 401) { out(); throw new Error("Session expired"); }
+  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || r.statusText);
+  return r.json();
+}
+async function login() {
+  $("err").textContent = "";
+  try { const r = await api("/auth/login", { method:"POST", body: JSON.stringify({ email:$("email").value, password:$("pw").value }) });
+    token = r.access_token; localStorage.setItem("mtoken", token); start(); } catch (e) { $("err").textContent = e.message; }
+}
+function out() { token = null; localStorage.removeItem("mtoken"); clearInterval(timer); $("main").hidden = true; $("out").hidden = true; $("login").hidden = false; }
+
+async function start() {
+  $("login").hidden = true; $("main").hidden = false; $("out").hidden = false;
+  try {
+    const ds = await api("/devices"); localStorage.setItem("mdevices", JSON.stringify(ds));
+    fillDevices(ds);
+  } catch (e) { fillDevices(JSON.parse(localStorage.getItem("mdevices") || "[]")); }
+  await refresh(); clearInterval(timer); timer = setInterval(refresh, 8000);
+}
+function fillDevices(ds) { const cur = $("dev").value; $("dev").innerHTML = ds.map(d => `<option value="${d.device_id}">${d.name}</option>`).join(""); if (cur) $("dev").value = cur; }
+
+function card(id, v, unit, ok, old) {
+  const el = $(id); el.className = "card" + (ok === false ? " bad" : "") + (old ? " old" : "");
+  el.querySelector(".v").innerHTML = ok === false ? "Sensor fault" : (v == null ? "-" : `${v.toFixed(1)}<small> ${unit}</small>`);
+}
+function render(latest, fromCache) {
+  const st = latest.status, r = latest.reading, old = fromCache || latest.stale;
+  $("pill").className = "pill " + (!fromCache && st.online ? "on" : "off");
+  $("pilltxt").textContent = fromCache ? "App offline" : st.online ? `Online · last contact ${hhmm(st.last_contact)}` : `Device offline · no data since ${hhmm(st.no_data_since)}`;
+  let n = "";
+  if (fromCache) n += `<div class="note info">No connection to the server. Showing the last values this phone received (${hhmm(latest._saved)}). They are not current.</div>`;
+  else if (latest.stale) n += `<div class="note">No data since ${hhmm(st.no_data_since)}. Values are the last known ones.</div>`;
+  if (r && r.sensor_fault && !old) n += `<div class="note">Alert: a sensor is failing (${["temperature","humidity","light"].filter(k => !r.valid[k]).join(", ")}).</div>`;
+  $("notes").innerHTML = n;
+  if (r) { card("c-t", r.temperature_c, "°C", r.valid.temperature, old); card("c-h", r.humidity_pct, "%", r.valid.humidity, old); card("c-l", r.light_pct, "%", r.valid.light, old); }
+  $("updated").textContent = r ? `Reading #${r.seq} · ${r.ts.replace("T", " ").replace("Z", " UTC")}` : "No readings yet";
+}
+async function refresh() {
+  const id = $("dev").value; if (!id) return;
+  try { const l = await api(`/devices/${id}/latest`); l._saved = new Date().toISOString(); localStorage.setItem("mlatest:" + id, JSON.stringify(l)); render(l, false); }
+  catch (e) { const c = localStorage.getItem("mlatest:" + id); if (c) render(JSON.parse(c), true); else $("notes").innerHTML = `<div class="note">Cannot reach the server and nothing is saved yet.</div>`; }
+}
+$("go").onclick = login; $("out").onclick = out; $("dev").onchange = refresh;
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
+if (token) start();
+</script>
+</body>
+</html>

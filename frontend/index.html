@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Environment Monitor - Dashboard</title>
+<style>
+  :root {
+    --bg:#f2f4f3; --panel:#ffffff; --ink:#18242b; --muted:#5d6b73; --line:#d9dfe1;
+    --accent:#0f6b73; --ok:#1f7a47; --bad:#b3261e; --warn:#8a5a00;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#12181b; --panel:#1b2428; --ink:#e7eef0; --muted:#9aa9b0; --line:#2c3a40;
+            --accent:#58c4cc; --ok:#5fcf8d; --bad:#ff8a80; --warn:#f0b955; color-scheme: dark; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; }
+  header { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 20px; border-bottom:1px solid var(--line); background:var(--panel); }
+  h1 { font-size:17px; margin:0; font-weight:650; }
+  main { max-width:980px; margin:0 auto; padding:20px; }
+  .login { max-width:340px; margin:60px auto; background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:22px; }
+  label { display:block; font-size:13px; color:var(--muted); margin:12px 0 4px; }
+  input, select, button { font:inherit; padding:8px 10px; border-radius:6px; border:1px solid var(--line); background:var(--bg); color:var(--ink); width:100%; }
+  button { background:var(--accent); color:#fff; border:0; cursor:pointer; margin-top:16px; font-weight:600; }
+  button.ghost { background:transparent; color:var(--ink); border:1px solid var(--line); width:auto; margin:0; }
+  button:focus-visible, input:focus-visible, select:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  .row { display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+  .status { display:inline-flex; align-items:center; gap:6px; font-weight:600; }
+  .dot { width:10px; height:10px; border-radius:50%; background:var(--muted); }
+  .online .dot { background:var(--ok); } .offline .dot { background:var(--bad); }
+  .banner { margin:14px 0; padding:10px 14px; border-radius:6px; border:1px solid var(--bad); color:var(--bad); background:transparent; }
+  .banner.warn { border-color:var(--warn); color:var(--warn); }
+  .metrics { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:14px; margin:16px 0; }
+  .metric { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:14px 16px; }
+  .metric .name { color:var(--muted); font-size:13px; }
+  .metric .val { font-size:34px; font-weight:650; letter-spacing:-.02em; }
+  .metric .val small { font-size:15px; color:var(--muted); font-weight:500; margin-left:3px; }
+  .metric.invalid .val { color:var(--bad); font-size:22px; padding:8px 0; }
+  .metric.stale .val { color:var(--muted); }
+  section { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:16px; margin:16px 0; }
+  h2 { font-size:15px; margin:0 0 10px; }
+  table { width:100%; border-collapse:collapse; font-size:13.5px; font-variant-numeric:tabular-nums; }
+  th, td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--line); }
+  th { color:var(--muted); font-weight:500; }
+  .wrap { overflow-x:auto; }
+  svg { width:100%; height:150px; display:block; }
+  .kv { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; }
+  .kv div span { display:block; color:var(--muted); font-size:12.5px; }
+  .kv div b { font-size:18px; }
+  .hidden { display:none; }
+  @media (prefers-reduced-motion: no-preference) { .dot { transition: background .3s; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Environment Monitor</h1>
+  <div class="row" id="who" hidden><span id="who-email"></span><button class="ghost" id="logout">Log out</button></div>
+</header>
+
+<div class="login" id="login-box">
+  <h2>Sign in</h2>
+  <label for="email">Email</label><input id="email" type="email" autocomplete="username">
+  <label for="pw">Password</label><input id="pw" type="password" autocomplete="current-password">
+  <button id="login-btn">Sign in</button>
+  <p id="login-err" style="color:var(--bad);min-height:1.4em"></p>
+</div>
+
+<main id="app" class="hidden">
+  <div class="row">
+    <div style="flex:1;min-width:200px"><label for="device">Device</label><select id="device"></select></div>
+    <div class="status" id="status"><span class="dot"></span><span id="status-text">-</span></div>
+  </div>
+  <div id="banner"></div>
+
+  <div class="metrics">
+    <div class="metric" id="m-temp"><div class="name">Temperature</div><div class="val">-</div></div>
+    <div class="metric" id="m-hum"><div class="name">Humidity</div><div class="val">-</div></div>
+    <div class="metric" id="m-light"><div class="name">Light</div><div class="val">-</div></div>
+  </div>
+
+  <section>
+    <h2>Temperature, last 40 readings</h2>
+    <svg id="chart" viewBox="0 0 600 150" preserveAspectRatio="none" role="img" aria-label="Temperature chart"></svg>
+  </section>
+
+  <section>
+    <h2>Last 24 h (BI indicators)</h2>
+    <div class="kv" id="kpis"></div>
+  </section>
+
+  <section>
+    <h2>AI result</h2>
+    <p style="margin:0;color:var(--muted)">Pending: the previa defines the problem and the baseline (see <code>/ia</code>). The model and <code>/predict</code> arrive in the final delivery.</p>
+  </section>
+
+  <section>
+    <h2>Recent readings</h2>
+    <div class="wrap"><table><thead><tr><th>seq</th><th>time (UTC)</th><th>temp °C</th><th>hum %</th><th>light %</th><th>origin</th></tr></thead><tbody id="rows"></tbody></table></div>
+  </section>
+</main>
+
+<script>
+const API = "/api/v1";
+const $ = (id) => document.getElementById(id);
+let token = sessionStorage.getItem("token");
+let timer = null;
+
+async function api(path, opts = {}) {
+  const res = await fetch(API + path, { ...opts, headers: { "Content-Type": "application/json", ...(token ? { Authorization: "Bearer " + token } : {}), ...(opts.headers || {}) } });
+  if (res.status === 401) { logout(); throw new Error("Session expired"); }
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || res.statusText);
+  return res.json();
+}
+const hhmm = (iso) => iso ? new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "never";
+
+async function login() {
+  $("login-err").textContent = "";
+  try {
+    const r = await api("/auth/login", { method: "POST", body: JSON.stringify({ email: $("email").value, password: $("pw").value }) });
+    token = r.access_token; sessionStorage.setItem("token", token); $("who-email").textContent = $("email").value;
+    start();
+  } catch (e) { $("login-err").textContent = e.message; }
+}
+function logout() { token = null; sessionStorage.removeItem("token"); clearInterval(timer); $("app").classList.add("hidden"); $("who").hidden = true; $("login-box").classList.remove("hidden"); }
+
+async function start() {
+  $("login-box").classList.add("hidden"); $("app").classList.remove("hidden"); $("who").hidden = false;
+  const devices = await api("/devices");
+  $("device").innerHTML = devices.map(d => `<option value="${d.device_id}">${d.name} (${d.device_id})</option>`).join("");
+  if (!devices.length) { $("banner").innerHTML = '<div class="banner warn">No devices yet. Create one with POST /api/v1/devices.</div>'; return; }
+  await refresh(); clearInterval(timer); timer = setInterval(refresh, 5000);
+}
+
+function setMetric(id, label, value, unit, valid, stale) {
+  const el = $(id); el.className = "metric" + (valid === false ? " invalid" : "") + (stale ? " stale" : "");
+  el.querySelector(".val").innerHTML = valid === false ? "Sensor fault" : (value == null ? "-" : `${value.toFixed(1)}<small>${unit}</small>`);
+}
+
+async function refresh() {
+  const id = $("device").value; if (!id) return;
+  try {
+    const [latest, list, stats] = await Promise.all([api(`/devices/${id}/latest`), api(`/devices/${id}/readings?limit=40`), api(`/devices/${id}/stats`)]);
+    const st = latest.status, r = latest.reading;
+    $("status").className = "status " + (st.online ? "online" : "offline");
+    $("status-text").textContent = st.online ? `Online · last contact ${hhmm(st.last_contact)}` : `Offline · no data since ${hhmm(st.no_data_since)}`;
+    let banner = "";
+    if (latest.stale) banner += `<div class="banner">No data since ${hhmm(st.no_data_since)}. Values below are the last known ones, not current.</div>`;
+    if (r && r.sensor_fault && !latest.stale) {
+      const bad = ["temperature","humidity","light"].filter(k => !r.valid[k]).join(", ");
+      banner += `<div class="banner">ALERT: sensor failure (${bad}). Invalid readings are not recorded as values.</div>`;
+    }
+    $("banner").innerHTML = banner;
+    if (r) {
+      setMetric("m-temp", "Temperature", r.temperature_c, "°C", r.valid.temperature, latest.stale);
+      setMetric("m-hum", "Humidity", r.humidity_pct, "%", r.valid.humidity, latest.stale);
+      setMetric("m-light", "Light", r.light_pct, "%", r.valid.light, latest.stale);
+    }
+    $("rows").innerHTML = list.items.slice(0, 15).map(x => `<tr><td>${x.seq}</td><td>${x.ts.replace("T"," ").replace("Z","")}</td><td>${x.temperature_c ?? "INVALID"}</td><td>${x.humidity_pct ?? "INVALID"}</td><td>${x.light_pct ?? "INVALID"}</td><td>${x.origin}</td></tr>`).join("");
+    drawChart(list.items.slice().reverse());
+    const f = (v) => v == null ? "-" : v;
+    $("kpis").innerHTML = [
+      ["Readings", stats.readings], ["Availability", stats.availability_pct == null ? "-" : stats.availability_pct + " %"],
+      ["Temp avg", f(stats.temperature_c.avg) + " °C"], ["Temp min / max", f(stats.temperature_c.min) + " / " + f(stats.temperature_c.max)],
+      ["Hum avg", f(stats.humidity_pct.avg) + " %"], ["Invalid (T/H/L)", `${stats.invalid.temperature}/${stats.invalid.humidity}/${stats.invalid.light}`],
+    ].map(([k, v]) => `<div><span>${k}</span><b>${v}</b></div>`).join("");
+  } catch (e) { $("banner").innerHTML = `<div class="banner">Cannot reach the API: ${e.message}</div>`; $("status").className = "status offline"; $("status-text").textContent = "API unreachable"; }
+}
+
+function drawChart(items) {
+  const pts = items.filter(i => i.temperature_c != null);
+  if (pts.length < 2) { $("chart").innerHTML = ""; return; }
+  const vals = pts.map(p => p.temperature_c), lo = Math.min(...vals) - 0.5, hi = Math.max(...vals) + 0.5;
+  const x = (i) => (i / (pts.length - 1)) * 590 + 5, y = (v) => 145 - ((v - lo) / (hi - lo)) * 135;
+  $("chart").innerHTML = `<polyline fill="none" stroke="var(--accent)" stroke-width="2" vector-effect="non-scaling-stroke" points="${pts.map((p, i) => x(i) + "," + y(p.temperature_c)).join(" ")}"/>
+    <text x="8" y="14" fill="var(--muted)" font-size="11">${hi.toFixed(1)} °C</text><text x="8" y="146" fill="var(--muted)" font-size="11">${lo.toFixed(1)} °C</text>`;
+}
+
+$("login-btn").onclick = login; $("logout").onclick = logout; $("device").onchange = refresh;
+$("pw").addEventListener("keydown", (e) => { if (e.key === "Enter") login(); });
+if (token) start().catch(logout);
+</script>
+</body>
+</html>
