@@ -1,25 +1,28 @@
-# UC requirements matrix (previa v0.9)
 
-Status is **Atendido** only when there is observable evidence. Everything else is Parcial or Pendente.
+# Matriz de requisitos da UC (prévia v0.9)
 
-| ID | UC | Requirement | Where it is implemented | Evidence | Status |
+Um requisito só recebe o status **Atendido** quando existe uma evidência observável de sua conclusão. Todos os demais devem ser classificados como Parcial ou Pendente.
+
+| ID | UC | Requisito | Onde está implementado | Evidência | Status |
 |---|---|---|---|---|---|
-| IOT-01 | IoT | Board with >= 2 sensors reading with physical units | `firmware/previa/previa.ino` | Serial monitor `[P1]` lines (DHT22 °C/%, LDR %) | Parcial |
-| IOT-02 | IoT | R1 reconnect + R5 invalid sensor handling | `previa.ino` (`ensureWifi`, `sample`) | Tests F1 and F3 in the demo | Parcial |
-| IOT-03 | IoT | ThingSpeak receiving real data, interval >= 15 s, HTTP response checked | `previa.ino` (`sendThingSpeak`) | Channel feed | Parcial |
-| IOT-04 | IoT | >= 48 h of collected data with descriptive stats | `/stats`, `database/queries.sql` | Export + summary | Pendente |
-| CLD-01 | Cloud | API on HTTPS, config by environment variables | `infra/Dockerfile`, `backend/.env.example` | Public URL + CI log | Pendente |
-| CLD-02 | Cloud | Dockerfile, secrets outside the code | `infra/Dockerfile`, `.gitignore` | Image builds in CI | Parcial |
-| SEG-01 | Security | STRIDE threat model of the main flow | `docs/seguranca/STRIDE.md` | Document | Atendido |
-| SEG-02 | Security | JWT auth; user only reaches own devices | `backend/app/security.py` | `test_other_users_device_is_403`, `test_no_token_is_401` | Atendido |
-| SEG-03 | Security | A device key cannot be used to impersonate another device | `device_from_key`, `ingest` | `test_key_of_one_device_cannot_write_as_another` | Atendido |
-| QUA-01 | Quality | Test plan | `docs/qualidade/TEST_PLAN.md` | Document | Atendido |
-| QUA-02 | Quality | Automated tests of main routes in GitHub Actions | `backend/tests`, `.github/workflows/ci.yml` | Green run after push | Parcial |
-| IA-01 | AI | Problem defined and baseline computed | `ia/baseline.py`, `ia/README.md` | MAE of the baseline on real data | Parcial |
-| MOB-01 | UE Mobile | Navigable prototype (Figma) | - | Figma link | Pendente |
-| MOB-02 | UE Mobile | App authenticates and lists real readings | `mobile/` (PWA) | Demo on a phone | Parcial |
-| CON-01 | Consumer | Persona, journey, value proposition backed by research (>= 5 interviews or >= 20 answers) | `docs/ux/` | Raw answers | Pendente |
-| ENG-01 | Tech English | README and API docs in English | `README.md`, `/docs` | Files | Atendido |
-| ENG-02 | Tech English | 2-minute pitch in English | `docs/slides.md` | Rehearsal | Parcial |
+| IOT-01 | IoT | Placa com pelo menos 2 sensores realizando leituras com unidades físicas | `firmware/previa/previa.ino` | Linhas do monitor serial `[P1]` (DHT22 °C/% e LDR %) | Parcial |
+| IOT-02 | IoT | Reconexão R1 + tratamento de sensores inválidos R5 | `previa.ino` (`ensureWifi`, `sample`) | Testes F1 e F3 na demonstração | Parcial |
+| IOT-03 | IoT | ThingSpeak recebendo dados reais, com intervalo ≥ 15 s e resposta HTTP verificada | `previa.ino` (`sendThingSpeak`) | Feed do canal | Parcial |
+| IOT-04 | IoT | Pelo menos 48 h de dados coletados com estatísticas descritivas | `/stats`, `database/queries.sql` | Exportação + resumo | Pendente |
+| CLD-01 | Nuvem | API em HTTPS, com configuração por variáveis de ambiente | `infra/Dockerfile`, `backend/.env.example` | URL pública + log do CI | Pendente |
+| CLD-02 | Nuvem | Dockerfile e segredos mantidos fora do código | `infra/Dockerfile`, `.gitignore` | Imagem construída no CI | Parcial |
+| SEG-01 | Segurança | Modelo de ameaças STRIDE do fluxo principal | `docs/seguranca/STRIDE.md` | Documento | Atendido |
+| SEG-02 | Segurança | Autenticação JWT; cada usuário acessa somente seus próprios dispositivos | `backend/app/security.py` | `test_other_users_device_is_403`, `test_no_token_is_401` | Atendido |
+| SEG-03 | Segurança | Uma chave de dispositivo não pode ser usada para se passar por outro dispositivo | `device_from_key`, `ingest` | `test_key_of_one_device_cannot_write_as_another` | Atendido |
+| QUA-01 | Qualidade | Plano de testes | `docs/qualidade/TEST_PLAN.md` | Documento | Atendido |
+| QUA-02 | Qualidade | Testes automatizados das principais rotas no GitHub Actions | `backend/tests`, `.github/workflows/ci.yml` | Execução bem-sucedida após o envio das alterações | Parcial |
+| IA-01 | IA | Problema definido e modelo de referência inicial calculado | `ia/baseline.py`, `ia/README.md` | MAE do modelo de referência com dados reais | Parcial |
+| MOB-01 | UE Mobile | Protótipo navegável (Figma) | - | Link do Figma | Pendente |
+| MOB-02 | UE Mobile | Aplicativo realiza autenticação e lista leituras reais | `mobile/` (PWA) | Demonstração em um celular | Parcial |
+| CON-01 | Consumidor | Persona, jornada e proposta de valor fundamentadas em pesquisa (pelo menos 5 entrevistas ou 20 respostas) | `docs/ux/` | Dispensa por escrito do professor (a ser anexada) | Dispensado (confirmação anexa) |
+| ENG-01 | Inglês Técnico | README e documentação da API em inglês | `README.md`, `/docs` | Arquivos | Atendido |
+| ENG-02 | Inglês Técnico | Apresentação de 2 minutos em inglês | `docs/slides.md` | Ensaio | Parcial |
 
-Every Parcial/Pendente item goes into `PLANO_ACAO.md`.
+Todos os itens com status Parcial/Pendente devem ser incluídos em `PLANO_ACAO.md`.
+
+> CON-01: o requisito de pesquisa foi dispensado pelo professor. A confirmação por escrito deve ser anexada em `docs/ux/` antes que esse status seja considerado válido.
